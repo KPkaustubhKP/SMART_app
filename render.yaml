@@ -1,42 +1,31 @@
 services:
-  # Backend API service
   - type: web
-    name: agri-monitor-api
-    env: python
+    name: smart-agriculture-backend
+    runtime: python
+    plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m app.main
+    startCommand: python main.py
+    rootDir: backend
     envVars:
       - key: PORT
         value: 8000
       - key: HOST
         value: 0.0.0.0
-      - key: DATABASE_PATH
-        value: ./agriculture_monitor.db
-      - key: OPENWEATHER_API_KEY
-        sync: false  # Set this in Render dashboard
       - key: FARM_LATITUDE
-        value: "40.7128"
-      - key: FARM_LONGITUDE  
-        value: "-74.0060"
-      - key: CORS_ORIGINS
-        value: "*"
-    healthCheckPath: /health
+        value: 13.353599
+      - key: FARM_LONGITUDE
+        value: 74.793633
 
-  # Frontend static site
   - type: web
-    name: agri-monitor-frontend
-    env: static
+    name: smart-agriculture-frontend
+    runtime: static
+    plan: free
     buildCommand: npm install && npm run build
-    staticPublishPath: ./build
+    staticPublishPath: build
+    rootDir: frontend
     envVars:
       - key: REACT_APP_API_URL
         fromService:
           type: web
-          name: agri-monitor-api
+          name: smart-agriculture-backend
           property: host
-
-databases:
-  # Optional: PostgreSQL for production (uncomment if needed)
-  # - name: agri-monitor-db
-  #   databaseName: agriculture_monitor
-  #   user: agri_user
