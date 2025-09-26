@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DATABASE_PATH=/app/data/agriculture_monitor.db
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-demo_key}
+      - FARM_LATITUDE=${FARM_LATITUDE:-40.7128}
+      - FARM_LONGITUDE=${FARM_LONGITUDE:--74.0060}
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:80
+    volumes:
+      - backend_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+
+volumes:
+  backend_data:
+    driver: local
+
+networks:
+  default:
+    name: agri-monitor-network
