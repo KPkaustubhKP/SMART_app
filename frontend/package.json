@@ -1,7 +1,9 @@
 {
   "name": "smart-agriculture-frontend",
   "version": "1.0.0",
+  "private": true,
   "scripts": {
-    "build": "echo 'No build needed' && mkdir -p build && cp -r public/* build/"
+    "build": "mkdir -p build && cp -r public/* build/",
+    "start": "echo 'Frontend built successfully'"
   }
 }
