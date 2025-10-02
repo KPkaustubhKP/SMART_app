@@ -1,0 +1,7 @@
+{
+  "name": "smart-agriculture-frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "echo 'No build needed' && mkdir -p build && cp -r public/* build/"
+  }
+}
