@@ -1,9 +1,9 @@
 {
   "name": "smart-agriculture-app",
-  "version": "1.0.0",
+  "version": "1.0.0", 
   "private": true,
   "scripts": {
-    "build": "mkdir -p build && cd frontend && cp -r public/* ../build/",
+    "build": "cp -r frontend/public ./build",
     "start": "echo 'Build completed successfully'"
   }
 }
