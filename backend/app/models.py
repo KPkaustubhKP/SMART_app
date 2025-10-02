@@ -2,7 +2,6 @@
 Data models for the Smart Agriculture IoT system
 Using Pydantic for data validation and serialization
 """
-
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List, Dict, Union
@@ -37,7 +36,7 @@ class WeatherAlertType(str, Enum):
 
 class NPKReading(BaseModel):
     nitrogen: float = Field(..., ge=0, le=500, description="Nitrogen level in ppm")
-    phosphorus: float = Field(..., ge=0, le=200, description="Phosphorus level in ppm") 
+    phosphorus: float = Field(..., ge=0, le=200, description="Phosphorus level in ppm")
     potassium: float = Field(..., ge=0, le=500, description="Potassium level in ppm")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
@@ -146,32 +145,3 @@ class SystemStatus(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
-
-class HistoricalDataRequest(BaseModel):
-    sensor_types: Optional[List[SensorType]] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    limit: int = Field(default=100, le=1000)
-    interval: str = Field(default="hour", regex="^(minute|hour|day)$")
-
-class CalibrationData(BaseModel):
-    sensor_type: SensorType
-    offset: float = 0.0
-    multiplier: float = 1.0
-    last_calibrated: datetime
-    calibrated_by: str
-
-class DeviceInfo(BaseModel):
-    device_id: str
-    device_type: str
-    location: Optional[str] = None
-    battery_level: Optional[float] = Field(None, ge=0, le=100)
-    signal_strength: Optional[int] = Field(None, ge=-100, le=0)
-    last_seen: datetime
-    is_online: bool
-    firmware_version: Optional[str] = None
-
-class Config:
-    json_encoders = {
-        datetime: lambda v: v.isoformat()
-    }

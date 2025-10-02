@@ -1,4 +1,3 @@
-# Backend main.py - Fixed for Render deployment
 import sys
 import os
 
@@ -55,32 +54,32 @@ db_manager = None
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     global sensor_manager, weather_service, db_manager
-    
+
     # Startup
     logger.info("Starting Agriculture Monitoring System...")
-    
+
     try:
         if DatabaseManager:
             # Initialize services
             db_manager = DatabaseManager()
             await db_manager.initialize()
-            
+
             if SensorManager:
                 sensor_manager = SensorManager(db_manager)
                 # Start background tasks
                 asyncio.create_task(sensor_manager.start_monitoring())
-            
+
             if WeatherService:
                 weather_service = WeatherService()
                 asyncio.create_task(weather_service.start_monitoring())
-        
+
         logger.info("Services started successfully")
     except Exception as e:
         logger.error(f"Startup error: {e}")
         # Continue with mock data if services fail
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Agriculture Monitoring System...")
     if sensor_manager:
@@ -101,7 +100,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://localhost:80",
+        "http://localhost:80", 
         "https://*.onrender.com",
         "https://smart-agriculture-frontend.onrender.com",
         "*"  # Allow all for development - restrict in production
@@ -121,7 +120,7 @@ async def root():
         "timestamp": datetime.utcnow().isoformat(),
         "endpoints": {
             "sensors": "/api/sensors/current",
-            "historical": "/api/sensors/historical",
+            "historical": "/api/sensors/historical", 
             "irrigation": "/api/irrigation/status",
             "weather": "/api/weather/current",
             "alerts": "/api/alerts"
@@ -137,7 +136,7 @@ async def health_check():
         "timestamp": datetime.utcnow().isoformat(),
         "services": {
             "database": "connected" if db_manager else "mock",
-            "sensors": "active" if sensor_manager else "mock",
+            "sensors": "active" if sensor_manager else "mock", 
             "weather": "active" if weather_service else "mock"
         }
     }
@@ -151,7 +150,7 @@ async def get_current_sensor_data():
             return await sensor_manager.get_current_readings()
         except Exception as e:
             logger.error(f"Sensor data error: {e}")
-    
+
     # Fallback with realistic mock data
     return {
         "timestamp": datetime.utcnow().isoformat(),
@@ -170,31 +169,6 @@ async def get_current_sensor_data():
         }
     }
 
-@app.get("/api/sensors/historical")
-async def get_historical_sensor_data(hours: int = 24, sensor_type: Optional[str] = None):
-    """Get historical sensor data"""
-    if sensor_manager:
-        try:
-            return await sensor_manager.get_historical_data(hours=hours, sensor_type=sensor_type)
-        except Exception as e:
-            logger.error(f"Historical data error: {e}")
-    
-    # Fallback mock data
-    data_points = []
-    for i in range(min(hours, 24)):  # Limit to 24 points for performance
-        timestamp = datetime.utcnow() - timedelta(hours=i)
-        data_points.append({
-            "timestamp": timestamp.isoformat(),
-            "value": round(random.uniform(30, 70), 1) if sensor_type == "soil_moisture" else round(random.uniform(20, 30), 1)
-        })
-    
-    return {
-        "sensor_type": sensor_type or "all",
-        "data_points": data_points,
-        "total_points": len(data_points)
-    }
-
-# Irrigation endpoints
 @app.get("/api/irrigation/status")
 async def get_irrigation_status():
     """Get current irrigation system status"""
@@ -203,7 +177,7 @@ async def get_irrigation_status():
             return await sensor_manager.get_irrigation_status()
         except Exception as e:
             logger.error(f"Irrigation status error: {e}")
-    
+
     # Fallback mock data
     return {
         "is_active": random.choice([True, False]),
@@ -221,7 +195,7 @@ async def control_irrigation(background_tasks: BackgroundTasks):
             # Execute irrigation command
             command = IrrigationCommand(activate=True, duration_minutes=15)
             background_tasks.add_task(sensor_manager.execute_irrigation, command)
-        
+
         return {
             "message": "Irrigation system activated successfully",
             "duration": "15 minutes",
@@ -232,12 +206,11 @@ async def control_irrigation(background_tasks: BackgroundTasks):
         logger.error(f"Irrigation control error: {e}")
         return {
             "message": "Irrigation system activated (mock)",
-            "duration": "15 minutes",
+            "duration": "15 minutes", 
             "timestamp": datetime.utcnow().isoformat(),
             "status": "active"
         }
 
-# Weather endpoints
 @app.get("/api/weather/current")
 async def get_current_weather():
     """Get current weather data and alerts"""
@@ -246,10 +219,10 @@ async def get_current_weather():
             return await weather_service.get_current_weather()
         except Exception as e:
             logger.error(f"Weather data error: {e}")
-    
+
     # Fallback mock data
     conditions = ["Clear Sky", "Partly Cloudy", "Cloudy", "Light Rain", "Sunny"]
-    
+
     return {
         "timestamp": datetime.utcnow().isoformat(),
         "temperature": round(random.uniform(22, 38), 1),
@@ -263,33 +236,6 @@ async def get_current_weather():
         "alerts": []
     }
 
-@app.get("/api/weather/forecast")
-async def get_weather_forecast(days: int = 5):
-    """Get weather forecast"""
-    if weather_service:
-        try:
-            return await weather_service.get_forecast(days=days)
-        except Exception as e:
-            logger.error(f"Weather forecast error: {e}")
-    
-    # Fallback mock data
-    forecast = []
-    for i in range(min(days, 7)):  # Limit to 7 days
-        date = datetime.utcnow() + timedelta(days=i)
-        forecast.append({
-            "date": date.date().isoformat(),
-            "temperature_high": round(random.uniform(25, 35), 1),
-            "temperature_low": round(random.uniform(15, 25), 1),
-            "description": random.choice(["Sunny", "Partly Cloudy", "Cloudy", "Light Rain"]),
-            "precipitation_chance": random.randint(0, 80)
-        })
-    
-    return {
-        "forecast": forecast,
-        "days": days
-    }
-
-# Alerts endpoint
 @app.get("/api/alerts")
 async def get_system_alerts():
     """Get system alerts and notifications"""
@@ -298,7 +244,7 @@ async def get_system_alerts():
             return await sensor_manager.get_active_alerts()
         except Exception as e:
             logger.error(f"Alerts error: {e}")
-    
+
     # Mock alerts with occasional warnings
     alerts = []
     if random.random() < 0.3:  # 30% chance of alert
@@ -310,35 +256,19 @@ async def get_system_alerts():
             "message": "Sensor values outside optimal range detected",
             "timestamp": datetime.utcnow().isoformat()
         })
-    
+
     return {
         "active_alerts": alerts,
         "total_count": len(alerts),
         "timestamp": datetime.utcnow().isoformat()
     }
 
-# System status endpoint
-@app.get("/api/system/status")
-async def get_system_status():
-    """Get overall system status"""
-    return {
-        "timestamp": datetime.utcnow().isoformat(),
-        "sensors_online": sensor_manager is not None,
-        "weather_service_online": weather_service is not None,
-        "irrigation_available": True,
-        "database_connected": db_manager is not None,
-        "uptime_hours": 24.0,  # Mock uptime
-        "active_alerts": 0,
-        "deployment": "render",
-        "version": "1.0.0"
-    }
-
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
-    
+
     logger.info(f"Starting server on {host}:{port}")
-    
+
     uvicorn.run(
         "main:app",
         host=host,

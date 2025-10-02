@@ -9,10 +9,9 @@ services:
       - PORT=8000
       - HOST=0.0.0.0
       - DATABASE_PATH=/app/data/agriculture_monitor.db
-      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-demo_key}
-      - FARM_LATITUDE=${FARM_LATITUDE:-40.7128}
-      - FARM_LONGITUDE=${FARM_LONGITUDE:--74.0060}
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:80
+      - PYTHONPATH=/app
+      - FARM_LATITUDE=40.7128
+      - FARM_LONGITUDE=-74.0060
     volumes:
       - backend_data:/app/data
     healthcheck:
@@ -23,14 +22,15 @@ services:
       start_period: 10s
 
   frontend:
-    build: ./frontend
+    image: nginx:alpine
     ports:
       - "80:80"
     depends_on:
       backend:
         condition: service_healthy
-    environment:
-      - REACT_APP_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend/public:/usr/share/nginx/html
+      - ./frontend/nginx.conf:/etc/nginx/nginx.conf:ro
 
 volumes:
   backend_data:

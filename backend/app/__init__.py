@@ -1,1 +1,2 @@
-# Smart Agriculture IoT Backend
+# Smart Agriculture IoT App
+__version__ = "1.0.0"

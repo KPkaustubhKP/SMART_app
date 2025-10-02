@@ -1,4 +1,3 @@
-# Fixed Frontend index.html with correct API configuration
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,7 +55,7 @@
         const getApiBase = () => {
             // Check if we're on Render or localhost
             const hostname = window.location.hostname;
-            
+
             if (hostname === 'localhost' || hostname === '127.0.0.1') {
                 return 'http://localhost:8000';
             } else if (hostname.includes('onrender.com')) {
@@ -80,11 +79,11 @@
                         'Content-Type': 'application/json',
                     },
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
                 console.log(`API response for ${endpoint}:`, data);
                 return data;
@@ -358,7 +357,7 @@
 
             const fetchData = async () => {
                 console.log('Fetching data from API...');
-                
+
                 // Test API connectivity first
                 const healthCheck = await apiCall('/health');
                 if (healthCheck) {
@@ -412,7 +411,7 @@
             return (
                 <div className="min-h-screen bg-gray-100">
                     <Header systemStatus={systemStatus} />
-                    
+
                     {notification && (
                         <Notification
                             message={notification.message}
@@ -420,7 +419,7 @@
                             onClose={hideNotification}
                         />
                     )}
-                    
+
                     <main className="container mx-auto px-6 py-8">
                         {/* Status Bar */}
                         <div className="bg-white rounded-lg shadow-md p-4 mb-8">
