@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cd frontend && mkdir -p build && cp -r public/* build/",
+    "build": "mkdir -p build && cd frontend && cp -r public/* ../build/",
     "start": "echo 'Build completed successfully'"
   }
 }
