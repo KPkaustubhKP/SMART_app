@@ -68,34 +68,33 @@
         };
 
 
-        const API_BASE = 'https://smart-agriculture-backend-y747.onrender.com';
+      const API_BASE = 'https://smart-agriculture-backend-y747.onrender.com';
 
-      /*  const API_BASE = getApiBase();
+// ✅ UNCOMMENTED - This function actually makes the API calls
+const apiCall = async (endpoint) => {
+    try {
+        console.log(`Making API call to: ${API_BASE}${endpoint}`);
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`API response for ${endpoint}:`, data);
+        return data;
+    } catch (error) {
+        console.error(`API call failed for ${endpoint}:`, error);
+        return null;
+    }
+};
 
-        // Utility function for API calls with better error handling
-        const apiCall = async (endpoint) => {
-            try {
-                console.log(`Making API call to: ${API_BASE}${endpoint}`);
-                const response = await fetch(`${API_BASE}${endpoint}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                console.log(`API response for ${endpoint}:`, data);
-                return data;
-            } catch (error) {
-                console.error(`API call failed for ${endpoint}:`, error);
-                return null;
-            }
-        };
-*/
         // Notification Component
         function Notification({ message, type, onClose }) {
             useEffect(() => {
