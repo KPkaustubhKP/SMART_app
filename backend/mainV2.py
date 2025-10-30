@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 # Get database path from environment or use default
 DB_PATH = os.getenv("DATABASE_PATH", "agriculture_monitor.db")
+
+
 import os
 from pathlib import Path
 
@@ -32,7 +34,9 @@ DB_PATH = os.getenv("DATABASE_PATH", "agriculture_monitor.db")
 db_dir = Path(DB_PATH).parent
 db_dir.mkdir(parents=True, exist_ok=True)
 
+
 # ==================== PYDANTIC MODELS ====================
+
 class PicoSensorData(BaseModel):
     """Model for receiving sensor data from Pico W"""
     device_id: str = Field(..., description="Unique identifier for the Pico W device")
@@ -52,6 +56,7 @@ class PicoResponse(BaseModel):
     device_id: Optional[str] = None
 
 # ==================== DATABASE FUNCTIONS ====================
+
 async def init_database():
     """Initialize all database tables"""
     async with aiosqlite.connect(DB_PATH) as db:
@@ -91,7 +96,7 @@ async def init_database():
         
         # Create indexes
         await db.execute('''
-            CREATE INDEX IF NOT EXISTS idx_device_timestamp
+            CREATE INDEX IF NOT EXISTS idx_device_timestamp 
             ON pico_sensor_data(device_id, timestamp)
         ''')
         
@@ -109,14 +114,15 @@ async def store_pico_sensor_data(data: PicoSensorData):
             nitrogen = None
             phosphorus = None
             potassium = None
+            
             if data.npk:
                 nitrogen = data.npk.get('nitrogen')
                 phosphorus = data.npk.get('phosphorus')
                 potassium = data.npk.get('potassium')
             
             await db.execute('''
-                INSERT INTO pico_sensor_data
-                (device_id, timestamp, soil_moisture, soil_temperature, humidity,
+                INSERT INTO pico_sensor_data 
+                (device_id, timestamp, soil_moisture, soil_temperature, humidity, 
                  light_intensity, soil_ph, nitrogen, phosphorus, potassium)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
@@ -134,6 +140,7 @@ async def store_pico_sensor_data(data: PicoSensorData):
             await db.commit()
             logger.info(f"Stored sensor data from device {data.device_id}")
             return True
+            
     except Exception as e:
         logger.error(f"Failed to store sensor data: {e}")
         return False
@@ -144,7 +151,7 @@ async def update_current_sensor_cache(data: PicoSensorData):
         async with aiosqlite.connect(DB_PATH) as db:
             # Update current readings
             await db.execute('''
-                UPDATE current_sensors SET
+                UPDATE current_sensors SET 
                     soil_moisture = ?,
                     soil_temperature = ?,
                     humidity = ?,
@@ -167,76 +174,9 @@ async def update_current_sensor_cache(data: PicoSensorData):
             ))
             await db.commit()
             logger.info("Updated current sensor cache")
+            
     except Exception as e:
         logger.error(f"Failed to update sensor cache: {e}")
-
-async def get_latest_sensor_data():
-    """Get the latest sensor data from database - either current or last received"""
-    try:
-        async with aiosqlite.connect(DB_PATH) as db:
-            # First try to get data from current_sensors table
-            cursor = await db.execute('''
-                SELECT soil_moisture, soil_temperature, humidity, light_intensity,
-                       soil_ph, nitrogen, phosphorus, potassium, last_updated
-                FROM current_sensors WHERE id = 1
-            ''')
-            row = await cursor.fetchone()
-            
-            # If we have recent data (within last hour), use it
-            if row and row[0] is not None and row[8]:
-                try:
-                    last_updated = datetime.fromisoformat(row[8].replace('Z', '+00:00'))
-                    time_diff = datetime.utcnow() - last_updated
-                    
-                    # If data is within the last hour, use current_sensors
-                    if time_diff <= timedelta(hours=1):
-                        return {
-                            "source": "current",
-                            "timestamp": row[8],
-                            "soil_moisture": round(float(row[0]), 2) if row[0] is not None else None,
-                            "soil_temperature": round(float(row[1]), 2) if row[1] is not None else None,
-                            "humidity": round(float(row[2]), 2) if row[2] is not None else None,
-                            "light_intensity": round(float(row[3]), 2) if row[3] is not None else None,
-                            "soil_ph": round(float(row[4]), 2) if row[4] is not None else None,
-                            "nitrogen": int(row[5]) if row[5] is not None else None,
-                            "phosphorus": int(row[6]) if row[6] is not None else None,
-                            "potassium": int(row[7]) if row[7] is not None else None
-                        }
-                except:
-                    # If timestamp parsing fails, continue to historical data
-                    pass
-            
-            # If no recent data in current_sensors, get the most recent from historical data
-            cursor = await db.execute('''
-                SELECT soil_moisture, soil_temperature, humidity, light_intensity,
-                       soil_ph, nitrogen, phosphorus, potassium, created_at, device_id
-                FROM pico_sensor_data
-                ORDER BY created_at DESC
-                LIMIT 1
-            ''')
-            row = await cursor.fetchone()
-            
-            if row:
-                return {
-                    "source": "historical",
-                    "timestamp": row[8],
-                    "device_id": row[9],
-                    "soil_moisture": round(float(row[0]), 2) if row[0] is not None else None,
-                    "soil_temperature": round(float(row[1]), 2) if row[1] is not None else None,
-                    "humidity": round(float(row[2]), 2) if row[2] is not None else None,
-                    "light_intensity": round(float(row[3]), 2) if row[3] is not None else None,
-                    "soil_ph": round(float(row[4]), 2) if row[4] is not None else None,
-                    "nitrogen": int(row[5]) if row[5] is not None else None,
-                    "phosphorus": int(row[6]) if row[6] is not None else None,
-                    "potassium": int(row[7]) if row[7] is not None else None
-                }
-            
-            # No data available at all
-            return None
-            
-    except Exception as e:
-        logger.error(f"Error reading sensor data: {e}")
-        return None
 
 # ==================== APP LIFECYCLE ====================
 
@@ -252,6 +192,7 @@ async def lifespan(app: FastAPI):
     
     # Startup
     logger.info("Starting Smart Agriculture API...")
+    
     try:
         # Initialize database
         await init_database()
@@ -267,6 +208,7 @@ async def lifespan(app: FastAPI):
             # Initialize services if modules are available
             db_manager = DatabaseManager()
             await db_manager.initialize()
+            
             sensor_manager = SensorManager(db_manager)
             weather_service = WeatherService()
             
@@ -278,7 +220,7 @@ async def lifespan(app: FastAPI):
             
         except ImportError as e:
             logger.warning(f"Optional modules not found: {e}. Using mock data.")
-            
+        
     except Exception as e:
         logger.error(f"Startup error: {e}")
         # Continue with mock data if initialization fails
@@ -294,6 +236,7 @@ async def lifespan(app: FastAPI):
             logger.error(f"Shutdown error: {e}")
 
 # ==================== FASTAPI APP ====================
+
 app = FastAPI(
     title="Smart Agriculture IoT API",
     description="Real-time agriculture monitoring system with sensor data, irrigation control, and weather integration",
@@ -306,7 +249,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://localhost:80",
+        "http://localhost:80", 
         "https://*.onrender.com",
         "https://smart-agriculture-frontend.onrender.com",
         "*"  # Allow all for development - restrict in production
@@ -317,6 +260,7 @@ app.add_middleware(
 )
 
 # ==================== API ENDPOINTS ====================
+
 @app.get("/")
 async def root():
     """API health check and info"""
@@ -341,14 +285,15 @@ async def health_check():
         # Check database connectivity
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("SELECT 1")
-            
-            # Check recent Pico activity
+        
+        # Check recent Pico activity
+        async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute('''
-                SELECT COUNT(*) FROM pico_sensor_data
+                SELECT COUNT(*) FROM pico_sensor_data 
                 WHERE created_at >= datetime('now', '-1 hour')
             ''')
             recent_data = await cursor.fetchone()
-            
+        
         return {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
@@ -362,14 +307,16 @@ async def health_check():
                 "weather": "active" if weather_service else "mock"
             }
         }
+        
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail="Service unhealthy")
 
 # ==================== PICO W ENDPOINTS ====================
+
 @app.post("/api/sensors/data", response_model=PicoResponse)
 async def receive_pico_sensor_data(
-    data: PicoSensorData, 
+    data: PicoSensorData,
     background_tasks: BackgroundTasks
 ):
     """Receive sensor data from Raspberry Pi Pico W"""
@@ -390,7 +337,7 @@ async def receive_pico_sensor_data(
     except Exception as e:
         logger.error(f"Error processing sensor data: {e}")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=f"Failed to process sensor data: {str(e)}"
         )
 
@@ -410,11 +357,12 @@ async def get_pico_device_status(device_id: str):
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute('''
                 SELECT device_id, timestamp, created_at
-                FROM pico_sensor_data
+                FROM pico_sensor_data 
                 WHERE device_id = ?
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC 
                 LIMIT 1
             ''', (device_id,))
+            
             row = await cursor.fetchone()
             
             if row:
@@ -430,6 +378,7 @@ async def get_pico_device_status(device_id: str):
                     "status": "never_seen",
                     "message": "No data received from this device"
                 }
+                
     except Exception as e:
         logger.error(f"Error getting device status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -445,31 +394,31 @@ async def get_pico_sensor_history(
         async with aiosqlite.connect(DB_PATH) as db:
             cursor = await db.execute('''
                 SELECT device_id, timestamp, soil_moisture, soil_temperature,
-                       humidity, light_intensity, soil_ph, nitrogen,
+                       humidity, light_intensity, soil_ph, nitrogen, 
                        phosphorus, potassium, created_at
-                FROM pico_sensor_data
-                WHERE device_id = ?
+                FROM pico_sensor_data 
+                WHERE device_id = ? 
                 AND created_at >= datetime('now', '-{} hours')
-                ORDER BY created_at DESC
+                ORDER BY created_at DESC 
                 LIMIT ?
             '''.format(hours), (device_id, limit))
             
             rows = await cursor.fetchall()
-            history = []
             
+            history = []
             for row in rows:
                 history.append({
                     "device_id": row[0],
                     "timestamp": row[1],
-                    "soil_moisture": round(float(row[2]), 2) if row[2] is not None else None,
-                    "soil_temperature": round(float(row[3]), 2) if row[3] is not None else None,
-                    "humidity": round(float(row[4]), 2) if row[4] is not None else None,
-                    "light_intensity": round(float(row[5]), 2) if row[5] is not None else None,
-                    "soil_ph": round(float(row[6]), 2) if row[6] is not None else None,
+                    "soil_moisture": row[2],
+                    "soil_temperature": row[3],
+                    "humidity": row[4],
+                    "light_intensity": row[5],
+                    "soil_ph": row[6],
                     "npk": {
-                        "nitrogen": int(row[7]) if row[7] is not None else None,
-                        "phosphorus": int(row[8]) if row[8] is not None else None,
-                        "potassium": int(row[9]) if row[9] is not None else None
+                        "nitrogen": row[7],
+                        "phosphorus": row[8],
+                        "potassium": row[9]
                     },
                     "created_at": row[10]
                 })
@@ -485,51 +434,65 @@ async def get_pico_sensor_history(
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== EXISTING API ENDPOINTS ====================
+
 @app.get("/api/sensors/current")
 async def get_current_sensor_data():
-    """Get current sensor readings - shows real WiFi data when available, otherwise last data received"""
+    """Get current sensor readings"""
+    if sensor_manager:
+        try:
+            return await sensor_manager.get_current_readings()
+        except Exception as e:
+            logger.error(f"Sensor data error: {e}")
     
-    # First try to get real sensor data from the database
-    sensor_data = await get_latest_sensor_data()
-    
-    if sensor_data:
-        logger.info(f"Returning {sensor_data['source']} sensor data from database")
-        
-        # Format response for dashboard compatibility
-        response = {
-            "timestamp": sensor_data["timestamp"],
-            "soil_moisture": sensor_data["soil_moisture"],
-            "soil_temperature": sensor_data["soil_temperature"],
-            "soil_ph": sensor_data["soil_ph"] if sensor_data["soil_ph"] is not None else 7.00,
-            "soil_conductivity": round(random.uniform(800, 1200), 2),  # Mock - not available from sensors
-            "air_temperature": sensor_data["soil_temperature"],  # Use soil temp as approximation
-            "humidity": sensor_data["humidity"],
-            "atmospheric_pressure": round(random.uniform(1005.00, 1025.00), 2),  # Mock - not available
-            "light_intensity": sensor_data["light_intensity"],
-            "npk": {
-                "nitrogen": sensor_data["nitrogen"] if sensor_data["nitrogen"] is not None else 120,
-                "phosphorus": sensor_data["phosphorus"] if sensor_data["phosphorus"] is not None else 45,
-                "potassium": sensor_data["potassium"] if sensor_data["potassium"] is not None else 175,
-                "timestamp": sensor_data["timestamp"]
-            }
-        }
-        
-        # Add data source info for debugging
-        if sensor_data["source"] == "historical":
-            response["data_source"] = "last_received"
-            if "device_id" in sensor_data:
-                response["last_device_id"] = sensor_data["device_id"]
-        else:
-            response["data_source"] = "current"
+    # Try to get real data from Pico if available, otherwise mock
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute('''
+                SELECT soil_moisture, soil_temperature, humidity, light_intensity,
+                       soil_ph, nitrogen, phosphorus, potassium, last_updated
+                FROM current_sensors WHERE id = 1
+            ''')
+            row = await cursor.fetchone()
             
-        return response
+            if row and row[0] is not None:  # Has real data
+                return {
+                    "timestamp": row[8] or datetime.utcnow().isoformat(),
+                    "soil_moisture": row[0],
+                    "soil_temperature": row[1],
+                    "soil_ph": row[4] or 7.0,
+                    "soil_conductivity": round(random.uniform(800, 1200), 0),  # Mock
+                    "air_temperature": row[1],  # Use soil temp as air temp approximation
+                    "humidity": row[2],
+                    "atmospheric_pressure": round(random.uniform(1005, 1025), 1),  # Mock
+                    "light_intensity": row[3],
+                    "npk": {
+                        "nitrogen": row[5] or 120,
+                        "phosphorus": row[6] or 45,
+                        "potassium": row[7] or 175,
+                        "timestamp": row[8] or datetime.utcnow().isoformat()
+                    }
+                }
+    except Exception as e:
+        logger.error(f"Error reading current sensors: {e}")
     
-    # If no real data exists at all, return an error or minimal response
-    logger.warning("No sensor data available in database")
-    return JSONResponse(
-        status_code=204,
-        content={"message": "No sensor data available yet"}
-    )
+    # Fallback with mock data
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "soil_moisture": round(random.uniform(30, 70), 1),
+        "soil_temperature": round(random.uniform(20, 30), 1),
+        "soil_ph": round(random.uniform(6.0, 7.5), 2),
+        "soil_conductivity": round(random.uniform(800, 1200), 0),
+        "air_temperature": round(random.uniform(22, 35), 1),
+        "humidity": round(random.uniform(45, 85), 1),
+        "atmospheric_pressure": round(random.uniform(1005, 1025), 1),
+        "light_intensity": round(random.uniform(20, 90), 1),
+        "npk": {
+            "nitrogen": round(random.uniform(100, 150), 0),
+            "phosphorus": round(random.uniform(30, 60), 0),
+            "potassium": round(random.uniform(150, 200), 0),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    }
 
 @app.get("/api/irrigation/status")
 async def get_irrigation_status():
@@ -558,14 +521,13 @@ async def control_irrigation(background_tasks: BackgroundTasks):
             from app.models import IrrigationCommand
             command = IrrigationCommand(activate=True, duration_minutes=15)
             background_tasks.add_task(sensor_manager.execute_irrigation, command)
-            
+        
         return {
             "message": "Irrigation system activated successfully",
             "duration": "15 minutes",
             "timestamp": datetime.utcnow().isoformat(),
             "status": "active"
         }
-        
     except Exception as e:
         logger.error(f"Irrigation control error: {e}")
         return {
@@ -584,18 +546,19 @@ async def get_current_weather():
         except Exception as e:
             logger.error(f"Weather data error: {e}")
     
-    # Fallback mock data with 2 decimal places
+    # Fallback mock data
     conditions = ["Clear Sky", "Partly Cloudy", "Cloudy", "Light Rain", "Sunny"]
+    
     return {
         "timestamp": datetime.utcnow().isoformat(),
-        "temperature": round(random.uniform(22, 38), 2),
-        "humidity": round(random.uniform(40, 85), 2),
-        "pressure": round(random.uniform(995, 1030), 2),
-        "wind_speed": round(random.uniform(5, 25), 2),
+        "temperature": round(random.uniform(22, 38), 1),
+        "humidity": round(random.uniform(40, 85), 1),
+        "pressure": round(random.uniform(995, 1030), 1),
+        "wind_speed": round(random.uniform(5, 25), 1),
         "wind_direction": random.choice(["N", "NE", "E", "SE", "S", "SW", "W", "NW"]),
         "description": random.choice(conditions),
         "uv_index": random.randint(1, 10),
-        "visibility": round(random.uniform(8, 25), 2),
+        "visibility": round(random.uniform(8, 25), 1),
         "alerts": []
     }
 
@@ -627,11 +590,13 @@ async def get_system_alerts():
     }
 
 # ==================== MAIN ====================
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
     
     logger.info(f"Starting Smart Agriculture API on {host}:{port}")
+    
     uvicorn.run(
         "main:app",
         host=host,
