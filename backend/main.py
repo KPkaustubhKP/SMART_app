@@ -24,6 +24,17 @@ logger = logging.getLogger(__name__)
 # Get database path from environment or use default
 DB_PATH = os.getenv("DATABASE_PATH", "agriculture_monitor.db")
 
+
+import os
+from pathlib import Path
+
+DB_PATH = os.getenv("DATABASE_PATH", "agriculture_monitor.db")
+
+# Ensure parent directory exists (Render path: /opt/render/project/src/data)
+db_dir = Path(DB_PATH).parent
+db_dir.mkdir(parents=True, exist_ok=True)
+
+
 # ==================== PYDANTIC MODELS ====================
 
 class PicoSensorData(BaseModel):
