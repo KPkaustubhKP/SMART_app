@@ -1,5 +1,6 @@
 import os
 import random
+import asyncio
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,10 +19,90 @@ DB_PATH = os.getenv("DATABASE_PATH", "agriculture_monitor.db")
 db_dir = Path(DB_PATH).parent
 db_dir.mkdir(parents=True, exist_ok=True)
 
-# ==================== GLOBAL STARTUP TIME ====================
-# Store once when app starts - never changes
-STARTUP_TIME = datetime.utcnow()
-logger.info(f"🚀 Backend started at {STARTUP_TIME}")
+# ==================== DUMMY DATA GENERATOR ====================
+
+class DummyDataManager:
+    """Generates realistic sensor values that evolve over time"""
+    
+    def __init__(self):
+        self.startup_time = datetime.utcnow()
+        self.initialization_delay = 10  # 10 seconds before showing data
+        self.last_values = {
+            "soil_moisture": 0.0,
+            "soil_temperature": 0.0,
+            "humidity": 0.0,
+            "light_intensity": 0.0,
+            "soil_ph": 0.0,
+            "nitrogen": 0,
+            "phosphorus": 0,
+            "potassium": 0,
+        }
+        self.realistic_values = {
+            "soil_moisture": 35.5,
+            "soil_temperature": 26.0,
+            "humidity": 65.0,
+            "light_intensity": 70.0,
+            "soil_ph": 6.8,
+            "nitrogen": 128,
+            "phosphorus": 52,
+            "potassium": 180,
+        }
+    
+    def get_dummy_data(self):
+        """Get realistic dummy data with smooth transitions"""
+        seconds_elapsed = (datetime.utcnow() - self.startup_time).total_seconds()
+        
+        # First 10 seconds: show empty/blank values
+        if seconds_elapsed < self.initialization_delay:
+            logger.info(f"⏳ Initialization delay: {self.initialization_delay - int(seconds_elapsed)}s remaining")
+            return {
+                "soil_moisture": 0.0,
+                "soil_temperature": 0.0,
+                "humidity": 0.0,
+                "light_intensity": 0.0,
+                "soil_ph": 0.0,
+                "nitrogen": 0,
+                "phosphorus": 0,
+                "potassium": 0,
+                "status": "initializing"
+            }
+        
+        # After 10 seconds: gradually transition to realistic values with small variations
+        progress = min((seconds_elapsed - self.initialization_delay) / 30.0, 1.0)  # 30s transition
+        
+        # Add realistic variations
+        soil_moisture = self.realistic_values["soil_moisture"] + random.uniform(-2.5, 2.5)
+        soil_temperature = self.realistic_values["soil_temperature"] + random.uniform(-0.5, 0.8)
+        humidity = self.realistic_values["humidity"] + random.uniform(-3, 3)
+        light_intensity = self.realistic_values["light_intensity"] + random.uniform(-5, 5)
+        soil_ph = self.realistic_values["soil_ph"] + random.uniform(-0.2, 0.2)
+        nitrogen = int(self.realistic_values["nitrogen"] + random.uniform(-10, 10))
+        phosphorus = int(self.realistic_values["phosphorus"] + random.uniform(-5, 5))
+        potassium = int(self.realistic_values["potassium"] + random.uniform(-15, 15))
+        
+        # Clamp values to realistic ranges
+        soil_moisture = max(0, min(100, soil_moisture))
+        soil_temperature = max(15, min(40, soil_temperature))
+        humidity = max(0, min(100, humidity))
+        light_intensity = max(0, min(100, light_intensity))
+        soil_ph = max(3, min(9, soil_ph))
+        nitrogen = max(0, nitrogen)
+        phosphorus = max(0, phosphorus)
+        potassium = max(0, potassium)
+        
+        return {
+            "soil_moisture": round(soil_moisture, 2),
+            "soil_temperature": round(soil_temperature, 2),
+            "humidity": round(humidity, 2),
+            "light_intensity": round(light_intensity, 2),
+            "soil_ph": round(soil_ph, 2),
+            "nitrogen": nitrogen,
+            "phosphorus": phosphorus,
+            "potassium": potassium,
+            "status": "initialized" if progress >= 1.0 else "transitioning"
+        }
+
+dummy_manager = DummyDataManager()
 
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -81,115 +162,20 @@ class PicoSensorData(BaseModel):
             }
         }
 
-# ==================== DUMMY DATA GENERATOR ====================
-
-def get_dummy_data():
-    """
-    Generate realistic sensor values that evolve over time
-    0-10s: Blank/zeros
-    10-40s: Transition to realistic
-    40+s: Stable realistic with variations
-    """
-    # Calculate seconds elapsed since backend started
-    seconds_elapsed = (datetime.utcnow() - STARTUP_TIME).total_seconds()
-    
-    # Phase 1: Initialization (0-10 seconds) - show blanks
-    if seconds_elapsed < 10:
-        logger.info(f"⏳ Phase 1: Initializing ({int(seconds_elapsed)}s) - showing blank values")
-        return {
-            "soil_moisture": 0.0,
-            "soil_temperature": 0.0,
-            "humidity": 0.0,
-            "light_intensity": 0.0,
-            "soil_ph": 0.0,
-            "nitrogen": 0,
-            "phosphorus": 0,
-            "potassium": 0,
-            "phase": "initializing"
-        }
-    
-    # Phase 2: Transition (10-40 seconds) - gradually increase
-    elif seconds_elapsed < 40:
-        progress = (seconds_elapsed - 10) / 30.0  # 0.0 to 1.0
-        logger.info(f"⏳ Phase 2: Transitioning ({int(seconds_elapsed)}s, progress: {progress*100:.0f}%) - ramping values")
-        
-        # Target realistic values
-        target_moisture = 35.5
-        target_temp = 26.0
-        target_humidity = 65.0
-        target_light = 70.0
-        target_ph = 6.8
-        target_n = 128
-        target_p = 52
-        target_k = 180
-        
-        # Gradually increase values
-        return {
-            "soil_moisture": round(target_moisture * progress, 2),
-            "soil_temperature": round(target_temp * progress, 2),
-            "humidity": round(target_humidity * progress, 2),
-            "light_intensity": round(target_light * progress, 2),
-            "soil_ph": round(target_ph * progress, 2),
-            "nitrogen": int(target_n * progress),
-            "phosphorus": int(target_p * progress),
-            "potassium": int(target_k * progress),
-            "phase": "transitioning"
-        }
-    
-    # Phase 3: Stable (40+ seconds) - realistic values with variations
-    else:
-        logger.info(f"✅ Phase 3: Initialized ({int(seconds_elapsed)}s) - showing realistic values")
-        
-        # Base realistic values for agricultural soil
-        soil_moisture = 35.5 + random.uniform(-2.5, 2.5)
-        soil_temperature = 26.0 + random.uniform(-0.8, 0.8)
-        humidity = 65.0 + random.uniform(-3, 3)
-        light_intensity = 70.0 + random.uniform(-5, 5)
-        soil_ph = 6.8 + random.uniform(-0.3, 0.3)
-        nitrogen = int(128 + random.uniform(-15, 15))
-        phosphorus = int(52 + random.uniform(-8, 8))
-        potassium = int(180 + random.uniform(-20, 20))
-        
-        # Clamp to realistic ranges
-        soil_moisture = max(0, min(100, soil_moisture))
-        soil_temperature = max(15, min(40, soil_temperature))
-        humidity = max(0, min(100, humidity))
-        light_intensity = max(0, min(100, light_intensity))
-        soil_ph = max(3, min(9, soil_ph))
-        nitrogen = max(0, nitrogen)
-        phosphorus = max(0, phosphorus)
-        potassium = max(0, potassium)
-        
-        return {
-            "soil_moisture": round(soil_moisture, 2),
-            "soil_temperature": round(soil_temperature, 2),
-            "humidity": round(humidity, 2),
-            "light_intensity": round(light_intensity, 2),
-            "soil_ph": round(soil_ph, 2),
-            "nitrogen": nitrogen,
-            "phosphorus": phosphorus,
-            "potassium": potassium,
-            "phase": "initialized"
-        }
-
 # ==================== FASTAPI APP ====================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🚀 Starting application with DEMO MODE...")
+    logger.info("🚀 Starting application...")
     await init_db()
     logger.info("✅ Database initialized")
-    logger.info("📊 DEMO MODE ACTIVE:")
-    logger.info("   0-10s: Blank values (initializing)")
-    logger.info("  10-40s: Transition to realistic values")
-    logger.info("   40+s:  Stable realistic demo data")
-    logger.info("   💾 Real Pico data overrides demo mode instantly")
+    logger.info("⏳ Dummy data will show after 10 second initialization delay")
     yield
     logger.info("🛑 Shutting down...")
 
 app = FastAPI(
     title="NPK Sensor API with Demo Mode",
-    description="Shows realistic demo data, switches to real Pico data when available",
+    description="API for Pico W NPK sensor data - shows realistic dummy data when disconnected",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -206,27 +192,25 @@ app.add_middleware(
 
 @app.get("/health")
 async def health_check():
-    dummy_data = get_dummy_data()
-    phase = dummy_data.pop("phase")
-    
+    dummy_data = dummy_manager.get_dummy_data()
     return {
         "status": "ok",
-        "message": "NPK Sensor API with Demo Mode",
+        "message": "NPK Sensor API is running with demo mode",
         "timestamp": datetime.utcnow().isoformat(),
-        "backend_uptime_seconds": int((datetime.utcnow() - STARTUP_TIME).total_seconds()),
-        "demo_phase": phase
+        "demo_status": dummy_data["status"]
     }
 
 @app.post("/api/sensors/data")
 async def receive_sensor_data(data: PicoSensorData):
-    """Receive REAL sensor data from Pico"""
+    """Receive REAL sensor data from Pico - takes priority over dummy data"""
     try:
-        logger.info(f"📡 REAL DATA from {data.device_id} | Temp: {data.soil_temperature}°C")
+        logger.info(f"📡 REAL DATA from {data.device_id} | Temp: {data.soil_temperature}°C | Moisture: {data.soil_moisture}%")
         
         nitrogen = data.npk.nitrogen if data.npk else None
         phosphorus = data.npk.phosphorus if data.npk else None
         potassium = data.npk.potassium if data.npk else None
         
+        # Mark as real data (not dummy)
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
                 """INSERT INTO sensor_data
@@ -241,7 +225,7 @@ async def receive_sensor_data(data: PicoSensorData):
             )
             await db.commit()
         
-        logger.info(f"✅ REAL data stored - demo mode DISABLED for {data.device_id}")
+        logger.info(f"✅ REAL data stored successfully - dummy data mode DISABLED")
         
         return {
             "status": "success",
@@ -257,20 +241,19 @@ async def receive_sensor_data(data: PicoSensorData):
 
 @app.get("/api/sensors/current")
 async def get_current_data(device_id: Optional[str] = None):
-    """Get latest sensor data - real Pico data if available, otherwise realistic demo data"""
+    """Get latest sensor data - shows real data if available, otherwise dummy data"""
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
             
-            # Try to get real data first
             if device_id:
                 cursor = await db.execute(
-                    "SELECT * FROM sensor_data WHERE device_id = ? AND is_dummy = 0 ORDER BY timestamp DESC LIMIT 1",
+                    "SELECT * FROM sensor_data WHERE device_id = ? ORDER BY timestamp DESC LIMIT 1",
                     (device_id,)
                 )
             else:
                 cursor = await db.execute(
-                    "SELECT * FROM sensor_data WHERE is_dummy = 0 ORDER BY timestamp DESC LIMIT 10"
+                    "SELECT * FROM sensor_data ORDER BY timestamp DESC LIMIT 10"
                 )
             
             rows = await cursor.fetchall()
@@ -291,18 +274,17 @@ async def get_current_data(device_id: Optional[str] = None):
                         "phosphorus": row["phosphorus"],
                         "potassium": row["potassium"]
                     },
-                    "data_type": "real",
+                    "data_type": "real" if not row["is_dummy"] else "dummy",
                     "created_at": row["created_at"]
                 })
             
-            # If no real data, return realistic demo data
+            # If no real data, generate and show dummy data
             if not data_list:
-                logger.info("📊 No real data - returning realistic DEMO data")
-                dummy_data = get_dummy_data()
-                phase = dummy_data.pop("phase")
+                logger.info("📊 No real data found - returning realistic dummy data")
+                dummy_data = dummy_manager.get_dummy_data()
                 
-                # Also store demo data for history
-                if phase != "initializing":
+                # Store dummy data in DB if not initializing
+                if dummy_data["status"] != "initializing":
                     async with aiosqlite.connect(DB_PATH) as db2:
                         await db2.execute(
                             """INSERT INTO sensor_data
@@ -338,8 +320,8 @@ async def get_current_data(device_id: Optional[str] = None):
                         "phosphorus": dummy_data["phosphorus"],
                         "potassium": dummy_data["potassium"]
                     },
-                    "data_type": "demo",
-                    "demo_phase": phase,
+                    "data_type": "dummy",
+                    "demo_status": dummy_data["status"],
                     "created_at": datetime.utcnow().isoformat()
                 }]
             
@@ -351,7 +333,7 @@ async def get_current_data(device_id: Optional[str] = None):
 
 @app.get("/api/sensors/history")
 async def get_history(device_id: str, limit: int = 100):
-    """Get historical data"""
+    """Get historical data for a device"""
     try:
         if limit > 1000:
             limit = 1000
@@ -382,7 +364,7 @@ async def get_history(device_id: str, limit: int = 100):
                         "phosphorus": row["phosphorus"],
                         "potassium": row["potassium"]
                     },
-                    "data_type": "real" if not row["is_dummy"] else "demo",
+                    "data_type": "real" if not row["is_dummy"] else "dummy",
                     "created_at": row["created_at"]
                 })
             
